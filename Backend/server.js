@@ -103,6 +103,55 @@ app.post("/api/execute", async (req, res) => {
   }
 });
 
+
+const Groq = require("groq-sdk");
+const groqClient = new Groq({ apiKey: process.env.GROQ_KEY });
+
+app.post("/api/evaluate", async (req, res) => {
+  const { code, language, problem } = req.body;
+
+  const prompt = `
+You are a coding evaluator.
+Problem: ${problem}
+
+Code (${language}):
+${code}
+
+Respond ONLY in this JSON format:
+{
+  "understanding": "",
+  "test_cases": [
+    {"input": "", "output": ""}
+  ],
+  "score": {
+    "logic": 0,
+    "time_complexity": 0,
+    "space_complexity": 0,
+    "code_quality": 0
+  },
+  "hints": ["", "", ""]
+}
+  `;
+
+  try {
+    const aiRes = await groqClient.chat.completions.create({
+      model: "openai/gpt-oss-20b",
+      messages: [{ role: "user", content: prompt }],
+    });
+
+
+    let text = aiRes.choices[0].message.content.trim();
+    text = text.replace(/```json|```/g, "");
+
+    res.json(JSON.parse(text));
+
+  } catch (err) {
+    console.log("AI ERROR DETAILS:", err.response?.data || err.message || err);
+    res.status(500).json({ error: "AI evaluation failed" });
+  }
+});
+
+
 // ----------------- Socket.IO: Collaboration -----------------
 const rooms = {}; // roomId -> { socketId -> username }
 const roomCode = {}; // roomId -> latest code

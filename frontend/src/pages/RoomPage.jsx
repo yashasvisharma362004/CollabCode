@@ -41,6 +41,14 @@ function RoomPage({  isDark , setIsDark }) {
   const [messages, setMessages] = useState([]);
   const [roomUsers, setRoomUsers] = useState([]); // array of user names
 
+
+
+  const [showAIWindow, setShowAIWindow] = useState(false);
+  const [aiData, setAiData] = useState(null);
+  const [evaluation, setEvaluation] = useState(null);
+
+
+
   const editorRef = useRef(null);
   const monacoRef = useRef(null);
 
@@ -102,6 +110,92 @@ function RoomPage({  isDark , setIsDark }) {
     setJoined(true);
   }
 }, [roomId, name, joined]);
+
+
+
+useEffect(() => {
+  const box = document.querySelector(".fixed");
+  const header = document.getElementById("ai-window-header");
+
+  if (!box || !header) return;
+
+  let offsetX = 0, offsetY = 0, dragging = false;
+
+  const mouseDown = (e) => {
+    dragging = true;
+    offsetX = e.clientX - box.offsetLeft;
+    offsetY = e.clientY - box.offsetTop;
+  };
+
+  const mouseMove = (e) => {
+    if (!dragging) return;
+    box.style.left = e.clientX - offsetX + "px";
+    box.style.top = e.clientY - offsetY + "px";
+  };
+
+  const mouseUp = () => (dragging = false);
+
+  header.addEventListener("mousedown", mouseDown);
+  window.addEventListener("mousemove", mouseMove);
+  window.addEventListener("mouseup", mouseUp);
+
+  return () => {
+    header.removeEventListener("mousedown", mouseDown);
+    window.removeEventListener("mousemove", mouseMove);
+    window.removeEventListener("mouseup", mouseUp);
+  };
+}, [showAIWindow]);
+
+
+
+
+// const [evaluation, setEvaluation] = useState(null);
+
+const evaluateWithAI = async () => {
+  // const problemDescription = prompt("Enter problem description:");
+  // if (!problemDescription) return;
+  const problemDescription = "Analyze the code and infer the problem automatically.";
+
+  setOutput("AI evaluating...");
+
+  try {
+    const res = await axios.post("http://localhost:8000/api/evaluate", {
+      language,
+      code,
+      problem: problemDescription
+    });
+
+    const ai = res.data;
+    setEvaluation(ai);
+
+    // Now run test cases using Judge0
+    let results = [];
+
+    for (let tc of ai.test_cases) {
+      const r = await axios.post("http://localhost:8000/api/execute", {
+        language,
+        code,
+        stdin: tc.input
+      });
+
+      results.push({
+        input: tc.input,
+        expected: tc.output,
+        actual: r.data.stdout || r.data.stderr
+      });
+    }
+
+    // setOutput(JSON.stringify({ ai, results }, null, 2));
+      setAiData({ ai, results });
+      setShowAIWindow(true);
+
+
+  } catch (err) {
+    setOutput("AI Error: " + err.message);
+  }
+};
+
+
 
 
   // ------------------ ERROR HANDLING ------------------
@@ -217,6 +311,7 @@ function RoomPage({  isDark , setIsDark }) {
   };
 
   // ------------------ FILE HANDLING ------------------
+
 const uploadFile = () => {
   const input = document.createElement("input");
   input.type = "file";
@@ -249,6 +344,7 @@ const uploadFile = () => {
 
   input.click();
 };
+
 
 
   const downloadCode = () => {
@@ -410,6 +506,17 @@ const uploadFile = () => {
             <Play className="w-4 h-4 inline mr-2" />
             {isRunning ? "Running..." : "Run"}
           </button>
+
+
+
+          {/* ⭐ AI Evaluate Button */}
+          <button
+            onClick={evaluateWithAI}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-lg text-sm"
+          >
+            AI Evaluate
+          </button>
+
         </div>
       </header>
 
@@ -475,6 +582,39 @@ const uploadFile = () => {
           {messages.map((m, i) => <div key={i}>{m}</div>)}
         </div>
       )}
+
+
+{showAIWindow && (
+        <div
+          className="fixed top-20 left-20 bg-slate-900 text-white border border-slate-500 rounded-lg shadow-2xl z-50"
+          style={{
+            width: "600px",
+            height: "400px",
+            resize: "both",
+            overflow: "auto",
+          }}
+        >
+          {/* Header */}
+          <div
+            className="flex justify-between items-center px-4 py-2 bg-slate-800 border-b border-slate-700 cursor-move"
+            id="ai-window-header"
+          >
+            <h2 className="font-semibold text-sm">AI Evaluation Result</h2>
+            <button
+              onClick={() => setShowAIWindow(false)}
+              className="text-red-400 hover:text-red-600 font-bold text-lg"
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Content */}
+          <div className="p-4 font-mono text-sm whitespace-pre overflow-auto">
+            {aiData ? JSON.stringify(aiData, null, 2) : "Loading..."}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
