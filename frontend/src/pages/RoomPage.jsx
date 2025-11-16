@@ -3,6 +3,8 @@ import { useLocation , useParams } from "react-router-dom";
 import Editor from "@monaco-editor/react";
 import io from "socket.io-client";
 import axios from "axios";
+import rehypeRaw from "rehype-raw";
+import ReactMarkdown from "react-markdown";
 import {
   Sun,
   Moon,
@@ -152,43 +154,104 @@ useEffect(() => {
 // const [evaluation, setEvaluation] = useState(null);
 
 const evaluateWithAI = async () => {
-  // const problemDescription = prompt("Enter problem description:");
-  // if (!problemDescription) return;
   const problemDescription = "Analyze the code and infer the problem automatically.";
-
   setOutput("AI evaluating...");
-
   try {
     const res = await axios.post("http://localhost:8000/api/evaluate", {
       language,
       code,
       problem: problemDescription
     });
+     console.log("AI RAW RESPONSE:", res.data);
+    const ai = res.data; // backend returns the JSON object
 
-    const ai = res.data;
-    setEvaluation(ai);
+const md = `
+<div class="ai-section">
 
-    // Now run test cases using Judge0
-    let results = [];
+## 🧠 Understanding  
+${ai.understanding}
 
-    for (let tc of ai.test_cases) {
-      const r = await axios.post("http://localhost:8000/api/execute", {
-        language,
-        code,
-        stdin: tc.input
-      });
+</div>
+<br>
+---
 
-      results.push({
-        input: tc.input,
-        expected: tc.output,
-        actual: r.data.stdout || r.data.stderr
-      });
-    }
+<div class="ai-section">
 
-    // setOutput(JSON.stringify({ ai, results }, null, 2));
-      setAiData({ ai, results });
-      setShowAIWindow(true);
+## 🧪 Test Cases  
 
+${ai.test_cases
+  ?.map(
+    tc => `
+**Input:**  
+\`${tc.input}\`
+
+**Expected Output:**  
+\`${tc.output}\`
+
+`
+  )
+  .join("\n")}
+
+</div>
+<br>
+---
+
+<div class="ai-section">
+
+## 📊 Score Breakdown
+
+<table class="w-full border-collapse border border-gray-300">
+<thead>
+<tr>
+<th class="border border-gray-300 px-2 py-1 text-left">Category</th>
+<th class="border border-gray-300 px-2 py-1 text-left">Rating</th>
+</tr>
+</thead>
+
+<tbody>
+<tr>
+<td class="border border-gray-300 px-2 py-1">Logic</td>
+<td class="border border-gray-300 px-2 py-1 font-semibold">${ai.score?.logic}/10</td>
+</tr>
+
+<tr>
+<td class="border border-gray-300 px-2 py-1">Time Complexity</td>
+<td class="border border-gray-300 px-2 py-1 font-semibold">${ai.score?.time_complexity}/10</td>
+</tr>
+
+<tr>
+<td class="border border-gray-300 px-2 py-1">Space Complexity</td>
+<td class="border border-gray-300 px-2 py-1 font-semibold">${ai.score?.space_complexity}/10</td>
+</tr>
+
+<tr>
+<td class="border border-gray-300 px-2 py-1">Code Quality</td>
+<td class="border border-gray-300 px-2 py-1 font-semibold">${ai.score?.code_quality}/10</td>
+</tr>
+</tbody>
+</table>
+
+
+</div>
+<br>
+---
+
+<div class="ai-section">
+
+## <h3>💡 Hints for Improvement  </h3>
+
+<ul style="list-style-type: disc; padding-left: 1.5rem;">
+${ai.hints?.map(h => `<li>${h}</li>`).join("")}
+</ul>
+
+
+</div>
+`;
+
+
+
+setAiData({ markdown: md });
+setShowAIWindow(true);
 
   } catch (err) {
     setOutput("AI Error: " + err.message);
@@ -609,9 +672,16 @@ const uploadFile = () => {
           </div>
 
           {/* Content */}
-          <div className="p-4 font-mono text-sm whitespace-pre overflow-auto">
-            {aiData ? JSON.stringify(aiData, null, 2) : "Loading..."}
+          <div className="p-4 text-sm overflow-auto ai-window-content">
+            <div className="prose prose-invert max-w-none">
+              {aiData ? (
+                <ReactMarkdown rehypePlugins={[rehypeRaw]}>
+                  {String(aiData.markdown || "")}
+                </ReactMarkdown>
+              ) : "Loading..."}
+            </div>
           </div>
+
         </div>
       )}
 

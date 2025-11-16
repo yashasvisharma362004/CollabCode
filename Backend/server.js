@@ -111,45 +111,76 @@ app.post("/api/evaluate", async (req, res) => {
   const { code, language, problem } = req.body;
 
   const prompt = `
-You are a coding evaluator.
-Problem: ${problem}
+You are an extremely strict and deterministic code evaluator.
+You MUST return valid JSON only. 
+No extra text. No markdown. No explanations before or after.
 
-Code (${language}):
-${code}
-
-Respond ONLY in this JSON format:
+JSON FORMAT (MANDATORY):
 {
-  "understanding": "",
+  "understanding": "string",
   "test_cases": [
-    {"input": "", "output": ""}
+    { "input": "string", "output": "string" }
   ],
   "score": {
-    "logic": 0,
-    "time_complexity": 0,
-    "space_complexity": 0,
-    "code_quality": 0
+    "logic": number,
+    "time_complexity": number,
+    "space_complexity": number,
+    "code_quality": number
   },
-  "hints": ["", "", ""]
+  "hints": ["string", "string"]
 }
-  `;
+
+Rules:
+- Output MUST be valid JSON.
+- The JSON MUST be exactly the same for the same input.
+- No randomness. No variation. No creativity.
+- Scores should be based ONLY on the provided code.
+- ALWAYS be consistent across runs.
+
+Problem:
+${problem}
+
+Code:
+${code}
+`;
 
   try {
     const aiRes = await groqClient.chat.completions.create({
       model: "openai/gpt-oss-20b",
-      messages: [{ role: "user", content: prompt }],
+      temperature: 0,     // FULLY deterministic
+      top_p: 1,           // No sampling
+      max_tokens: 800,    // Prevent runaway output
+      messages: [
+        { role: "system", content: "You must respond with STRICT JSON. No markdown." },
+        { role: "user", content: prompt }
+      ]
     });
 
+    let raw = aiRes.choices[0].message.content.trim();
 
-    let text = aiRes.choices[0].message.content.trim();
-    text = text.replace(/```json|```/g, "");
+    // remove accidental markdown fences
+    raw = raw.replace(/```json|```/g, "");
 
-    res.json(JSON.parse(text));
+    let data;
+    try {
+      data = JSON.parse(raw);
+    } catch (err) {
+      return res.status(400).json({
+        error: "AI returned invalid JSON",
+        raw
+      });
+    }
+
+    return res.json(data);
 
   } catch (err) {
-    console.log("AI ERROR DETAILS:", err.response?.data || err.message || err);
-    res.status(500).json({ error: "AI evaluation failed" });
+    console.log("AI ERROR DETAILS:", err.response?.data || err.message);
+    return res.status(500).json({ error: "AI evaluation failed." });
   }
 });
+
+
+
 
 
 // ----------------- Socket.IO: Collaboration -----------------
