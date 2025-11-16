@@ -6,6 +6,9 @@ const axios = require("axios");
 const http = require("http");
 const { Server } = require("socket.io");
 
+const { OAuth2Client } = require("google-auth-library");
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
@@ -102,6 +105,33 @@ app.post("/api/execute", async (req, res) => {
     res.status(500).json({ stdout: "", stderr: err.message || "Unknown error", hasError: true });
   }
 });
+
+app.post("/auth/google", async (req, res) => {
+  try {
+    const { token } = req.body;
+
+    const ticket = await client.verifyIdToken({
+      idToken: token,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+    
+    // user info
+    const user = {
+      name: payload.name,
+      email: payload.email,
+      picture: payload.picture,
+    };
+
+    return res.json({ success: true, user });
+
+  } catch (err) {
+    console.error(err);
+    return res.status(400).json({ success: false, msg: "Invalid token" });
+  }
+});
+
 
 
 const Groq = require("groq-sdk");

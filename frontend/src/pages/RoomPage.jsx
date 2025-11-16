@@ -27,12 +27,15 @@ function RoomPage({  isDark , setIsDark }) {
   const [code, setCode] = useState("// Write your code here\n");
   const [stdin, setStdin] = useState("");
   const [output, setOutput] = useState("");
+
   const location = useLocation();
-  const { roomId: paramRoomId } = useParams();          // gets roomId from URL
-  const { name: stateName } = location.state || {};     // gets name from navigate state
+
+  const paramRoomId = useParams()?.roomId;
+  const stateName = location.state?.name;
 
   const [roomId, setRoomId] = useState(paramRoomId || "");
-  const [name, setName] = useState(stateName || "");
+  const [name, setName] = useState(stateName ||  localStorage.getItem("username") || "");
+  const username = stateName || "Guest";
 
   const [joined, setJoined] = useState(false);
   const [usersCount, setUsersCount] = useState(0);
@@ -42,6 +45,7 @@ function RoomPage({  isDark , setIsDark }) {
 
   const [messages, setMessages] = useState([]);
   const [roomUsers, setRoomUsers] = useState([]); // array of user names
+
 
 
 
@@ -107,7 +111,7 @@ function RoomPage({  isDark , setIsDark }) {
   // }, [initialRoomId, initialName]);
 
   useEffect(() => {
-  if (!joined && roomId && name) {
+  if (!joined && roomId && name.trim().length > 0) {
     socket.emit("join-room", { roomId, name });
     setJoined(true);
   }
@@ -497,6 +501,7 @@ const uploadFile = () => {
 
   // ------------------ JSX ------------------
   return (
+    
     <div className={`h-screen w-screen flex flex-col ${currentTheme.bg} ${currentTheme.text}`}>
       {/* HEADER */}
       <header className={`${currentTheme.headerBg} ${currentTheme.border} border-b px-6 py-3 flex justify-between items-center`}>
@@ -527,7 +532,7 @@ const uploadFile = () => {
   {roomUsers.length === 0 ? (
     <div className="text-xs text-slate-400 italic pr-2">No users</div>
   ) : (
-    roomUsers.map((user, idx) => (
+    roomUsers.filter(Boolean).map((user, idx) => (
       <div key={idx} className="group relative m-1">
         <div
           title={user}
