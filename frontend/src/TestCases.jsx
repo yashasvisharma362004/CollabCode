@@ -10,7 +10,7 @@ export default function TestCases({ language, code }) {
     const results = [];
     for (const tc of testCases) {
       try {
-        const response = await fetch("http://localhost:8000/api/execute", {
+        const response = await fetch("https://collabcode-p8b4.onrender.com/api/execute", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ language, code, stdin: tc.input }),
